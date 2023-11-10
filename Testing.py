@@ -227,8 +227,8 @@ def class_balance(split, split_n):
             mask_without_annots += 1
     mask_with_perc = mask_with_annots / len(split)
     mask_without_perc = mask_without_annots / len(split)
-    print(f'# of Masks with annotations: {mask_with_annots} ({mask_with_perc:.2f}%)\n'
-          f'# of Masks without annotations: {mask_without_annots} ({mask_without_perc:.2f}%)')
+    print(f'# of Masks with annotations: {mask_with_annots} ({mask_with_perc:.2f})\n'
+          f'# of Masks without annotations: {mask_without_annots} ({mask_without_perc:.2f})')
 
 
 split_list = [train_masks, val_masks, test_masks]

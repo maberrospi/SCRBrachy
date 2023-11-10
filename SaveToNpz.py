@@ -115,6 +115,7 @@ def split_folders(CT_DIR, MASK_DIR):
     indices, res = zip(*temp2)
     res1, res2 = zip(*res)
     # res1 and res2 returned as tuples, and so must be converted to lists.
+    # res1 and res2 add a sort of second shuffling which produced more balanced splitting
     indices, res1, res2 = list(indices), list(res1), list(res2)
     print(f"CTS after shuffle :  {res1}")
     print(f"Masks after shuffle :  {res2}")
@@ -126,8 +127,9 @@ def split_folders(CT_DIR, MASK_DIR):
     train_patients = indices[:split_train_idx]
     val_patients = indices[split_train_idx:split_val_idx]
     test_patients = indices[split_val_idx:]
-    # For next time, I have to loop through the indices in the sets, access the folders based on index, open npy or img
-    # and save to different npz files similar to save_CT_to_npz_V2
+    print(f'Train Patient Indexes : {train_patients}\n'
+          f'Validation Patient Indexes: {val_patients}\n'
+          f'Test Patient Indexes: {test_patients}')
     # Loop through all the training patients folders
     print("Saving all CT npy arrays and masks to NPZ")
     # Loop through the 3 sets

@@ -1,0 +1,2 @@
+To activate: conda activate baseenv
+To deactivate: conda deactivate

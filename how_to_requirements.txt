@@ -1,0 +1,17 @@
+From conda env to be used from pip virtual env:
+1. activate conda env
+2. pip freeze > requirements.txt
+3. create virtual environment (for example 'venv')
+4. pip install -r requirements.txt
+From conda env to conda env:
+1. activate conda env
+2. conda list -e > requirements.txt
+3. conda create --name <env> --file requirements.txt
+Extra info:
+If odd path references in txt file -> pip list --format=freeze > requirements.txt
+
+From conda env to conda env using yml file:
+1. activate conda env
+2. conda env export > env.yml
+3. conda env create -f env.yml
+4. Read the first line of the yml file to see environment's name

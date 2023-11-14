@@ -50,6 +50,7 @@ def evaluate_loss(model, validation_loader, criterion, device, amp):
     model.eval()
     num_val_batches = len(validation_loader)
     val_loss = 0
+    total_val_loss = 0
     with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
         for batch in tqdm(validation_loader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
             images, true_masks = batch['image'], batch['mask']
@@ -74,4 +75,7 @@ def evaluate_loss(model, validation_loader, criterion, device, amp):
                     F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
                     multiclass=True
                 )
-        return val_loss / num_val_batches
+
+            total_val_loss += val_loss
+
+    return total_val_loss / num_val_batches

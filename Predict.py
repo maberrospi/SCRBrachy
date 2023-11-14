@@ -8,7 +8,7 @@ from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from Metrics import multiclass_dice_coeff, dice_coeff, dice_loss
-from Train import CTCatheterDataset, train_x, train_y, valid_x, valid_y, NormalizationMinMax, ToTensor
+from Train import CTCatheterDataset, train_cts, train_masks, val_cts, val_masks, NormalizationMinMax, ToTensor
 from Model import UNet
 
 
@@ -71,31 +71,38 @@ def plot_img_and_mask(image, mask, orig_mask):
 
 
 def main():
-    # Define model
+    # # Define model
     model = UNet(n_channels=1, n_classes=1)
     device = torch.device('cpu')  # torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Load the trained model
     model.load_state_dict(
-        torch.load("/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/debugging4/checkpoint_epoch10.pth",
+        torch.load("/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/debugging7/checkpoint_epoch10.pth",
                    map_location=device))
 
-    # # Run inference on a single image
-    path = "/home/ERASMUSMC/099035/Documents/Masks/Mask11_34.png"
-    path2 = "/home/ERASMUSMC/099035/Documents/CTimages/CT11_34.png"
-    mask = Image.open(path)
-    img = Image.open(path2)
-    # Pass image to run inference on and then plot prediction
-    pred_mask = predict_image(model, img, device, mask)
-    plot_img_and_mask(img, pred_mask, mask)
+    # # # Run inference on a single image
+    # path = "/home/ERASMUSMC/099035/Documents/Masks/Mask11_34.png"
+    # path2 = "/home/ERASMUSMC/099035/Documents/CTimages/CT11_34.png"
+    # mask = Image.open(path)
+    # img = Image.open(path2)
+    # # Pass image to run inference on and then plot prediction
+    # pred_mask = predict_image(model, img, device, mask)
+    # plot_img_and_mask(img, pred_mask, mask)
 
     # Run inference on entire set and return dice coefficient
-    # data_transform_val_test = v2.Compose([
-    #     # Truncate(),
-    #     NormalizationMinMax(),
-    #     ToTensor(),
-    # ])
+    data_transform_val_test = v2.Compose([
+        # Truncate(),
+        NormalizationMinMax(),
+        ToTensor(),
+    ])
+    train_dataset = CTCatheterDataset(train_cts, train_masks, transform=data_transform_val_test, train=False)
+    val_dataset = CTCatheterDataset(val_cts, val_masks, transform=data_transform_val_test, train=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+    predict_dice_score(model, val_dataloader, device)
+
+    # Old split
     # train_dataset = CTCatheterDataset(train_x, train_y, transform=data_transform_val_test, train=False)
-    # val_dataset = CTCatheterDataset(valid_x, valid_y, transform=data_transform_val_test, train=True)
+    # val_dataset = CTCatheterDataset(valid_x, valid_y, transform=data_transform_val_test, train=False)
     # train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
     # val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
     # predict_dice_score(model, train_dataloader, device)

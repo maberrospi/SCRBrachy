@@ -34,6 +34,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision import utils
 from torchvision.transforms import v2
+from torchvision.transforms import InterpolationMode
 import torchvision.transforms.functional as TF
 from torchinfo import summary
 import random
@@ -223,11 +224,21 @@ class ToTensor(object):
 
 
 class NormalizationMinMax(object):
-    """Normalize all the data using min max normalization between 0-255"""
+    """
+        Normalize all the data using min max normalization between 0-1
+        The Masks are numpy arrays that contain either 0 or 1(255) for black and white respectively
+            Therefore the masks are normalized by just dividing with 255
+        The CT images are numpy arrays that contain Hounsfield unit values
+            The min and max from all the training slices has been pre-calculated and is -1024 and 3071 respectively
+            These values will have to be changed if you use a different dataset
+            Therefore the images are normalized by subtracting the min and dividing by the max-min
+    """
 
     def __call__(self, sample):
         image, mask = sample['image'], sample['mask']
-        image = image / 255
+        #image = image / 255
+        # Min-Max-Norm = (x-min) / (max-min)
+        image = (image + 1024) / (3071+1024)
         mask = mask / 255
         return {'image': image,
                 'mask': mask}
@@ -341,7 +352,7 @@ def train_model(
     print(mod_sum)
 
     # Create a writer with all default settings for use with TensorBoard
-    writer = SummaryWriter(log_dir='/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/runs/debugging4batch32')
+    writer = SummaryWriter(log_dir='/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/runs/patientsplitbatch32balancedMore_lowerlr_pat10')
 
     # 1. Create datasets 
     # We are using BETA APIs, so we deactivate the associated warning, thereby acknowledging that
@@ -352,6 +363,7 @@ def train_model(
         # Truncate(),
         NormalizationMinMax(),
         ToTensor(),
+        #v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT),
         RandomHorizontalFlip(chance=0.5),
         RandomVerticalFlip(chance=0.5),
         RandomRotation(degrees=(-30, +30), chance=0.5)
@@ -362,6 +374,7 @@ def train_model(
         # Truncate(),
         NormalizationMinMax(),
         ToTensor(),
+        #v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT)
     ])
 
     # Limit the train and validation sets to make it easier to debug
@@ -371,8 +384,8 @@ def train_model(
     # valid_y_t = valid_y[0:10]
     # train_dataset = CTCatheterDataset(train_x_t, train_y_t, transform=data_transform, train=False)
     # val_dataset = CTCatheterDataset(valid_x_t, valid_y_t, transform=data_transform, train=False)
-    train_dataset = CTCatheterDataset(train_x, train_y, transform=data_transform, train=True)
-    val_dataset = CTCatheterDataset(valid_x, valid_y, transform=data_transform_val_test, train=False)
+    train_dataset = CTCatheterDataset(train_cts, train_masks, transform=data_transform, train=True)
+    val_dataset = CTCatheterDataset(val_cts, val_masks, transform=data_transform_val_test, train=False)
     n_train = len(train_dataset)
     n_val = len(val_dataset)
     print(f"Train size: {n_train}\nValidation size: {n_val}")
@@ -402,14 +415,14 @@ def train_model(
     # 3. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.RMSprop(model.parameters(),
                               lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=10)  # goal: maximize Dice score
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     # BCEWithLogitsLoss takes prediction as raw input instead of having to wrap it in sigmoid function
     # https://stackoverflow.com/questions/66906884/how-is-pytorchs-class-bcewithlogitsloss-exactly-implemented
     # Test using pos_weight
-    pos_weight = torch.full([1, 512, 512], 100)
+    pos_weight = torch.full([1, 512, 512], 1000)
     pos_weight = pos_weight.to(device=device, dtype=torch.float32)
-    criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss()  # pos_weight=pos_weight)
+    criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     early_stopper = EarlyStopping(patience=5, min_delta=0)
     global_step = 0
 
@@ -488,6 +501,7 @@ def train_model(
                     if global_step % division_step == 0:
                         val_score = evaluate(model, val_dataloader, device, amp)
                         scheduler.step(val_score)
+                        logging.info('Learning Rate: {}' .format(optimizer.param_groups[0]['lr']))
                         logging.info('Validation Dice score: {}'.format(val_score))
 
         # Steps for computing the validation loss after every epoch
@@ -530,16 +544,24 @@ def show_sample(image, mask):
 
 
 # %% Global Variables %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/Masks/mask_npz.npz'
-CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimages/ct_npz.npz'
-DIR_CHECKPOINT = Path('/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/debugging4/')
+DIR_CHECKPOINT = Path('/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/exp3/')
 
 # Load the data
 # cts and masks are lists of tuples where tuple index0 is the name and index1 is the numpy array
-cts, masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTrain.npz'
+CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTrain.npz'
+train_cts, train_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskVal.npz'
+CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctVal.npz'
+val_cts, val_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+
+# This was done previously when all the data was split but not by patient
+# MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/Masks/mask_npz.npz'
+# CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimages/ct_npz.npz'
+#cts, masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
 # Split the data into train/val/test
 # Train-80%,Val-10%-Test-10%
-(train_x, train_y), (valid_x, valid_y), (test_x, test_y) = split_data(cts, masks)
+#(train_x, train_y), (valid_x, valid_y), (test_x, test_y) = split_data(cts, masks)
 
 
 # As a reminder, sets have a shape of HxW
@@ -557,8 +579,8 @@ def main():
 
     # Hypeparameters
     batch_size = 32
-    learning_rate = 1e-6
-    epochs = 10
+    learning_rate = 1e-7
+    epochs = 30
     save_checkpoint = True
     weight_decay: float = 1e-8
     momentum: float = 0.999
@@ -592,6 +614,7 @@ def main():
             epochs=epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
+            weight_decay=weight_decay,
             save_checkpoint=save_checkpoint,
             device=device,
             amp=amp
@@ -607,6 +630,7 @@ def main():
             epochs=epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
+            weight_decay=weight_decay,
             device=device,
             amp=amp
         )

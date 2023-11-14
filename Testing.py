@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import v2
+from torchvision.transforms import InterpolationMode
 from Metrics import dice_coeff, dice_loss
 from Train import load_data_npz, split_data, show_sample, CTCatheterDataset, ToTensor, NormalizationMinMax, \
     RandomRotation, RandomHorizontalFlip, RandomVerticalFlip
@@ -190,49 +191,69 @@ from Train import load_data_npz, split_data, show_sample, CTCatheterDataset, ToT
 # print(cts_list[0:5])
 
 
-# Test if the distribution of classes is equal in the patient wise split
+# # Test if the distribution of classes is equal in the patient wise split
+# MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTrain.npz'
+# CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTrain.npz'
+# # Load the data
+# # cts and masks are lists of tuples where tuple index0 is the name and index1 is the numpy array
+# # Train-80%,Val-10%-Test-10%
+# train_cts, train_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+# MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskVal.npz'
+# CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctVal.npz'
+# val_cts, val_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+# MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTest.npz'
+# CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTest.npz'
+# test_cts, test_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
+#
+# # Print the percentages of the sets
+# total_len = len(train_cts) + len(val_cts) + len(test_cts)
+# print("Ignore above as its from the Train.py file")
+# print(
+#     f'Train set contains {len(train_cts)} samples or {np.round(len(train_cts) / total_len * 100, 1)}% of the total data')
+# print(
+#     f'Validation set contains {len(val_cts)} samples or {np.round(len(val_cts) / total_len * 100, 1)}% of the total data')
+# print(
+#     f'Test set contains {len(test_cts)} samples or {np.round(len(test_cts) / total_len * 100, 1)}% of the total data')
+#
+#
+# def class_balance(split, split_n):
+#     mask_with_annots = 0
+#     mask_without_annots = 0
+#     print(f'{split_n} set')
+#     for item in split:
+#         # If item contains non-zero items it means we have a mask with catheter points
+#         if np.any(item[1]):
+#             mask_with_annots += 1
+#         else:
+#             mask_without_annots += 1
+#     mask_with_perc = mask_with_annots / len(split)
+#     mask_without_perc = mask_without_annots / len(split)
+#     print(f'# of Masks with annotations: {mask_with_annots} ({mask_with_perc:.2f})\n'
+#           f'# of Masks without annotations: {mask_without_annots} ({mask_without_perc:.2f})')
+#
+#
+# split_list = [train_masks, val_masks, test_masks]
+# split_names = ['Train', 'Validation', 'Test']
+#
+# for idx, split in enumerate(split_list):
+#     class_balance(split, split_names[idx])
+
+
+# Test the resizing transformation
+# Load data
 MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTrain.npz'
 CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTrain.npz'
-# Load the data
-# cts and masks are lists of tuples where tuple index0 is the name and index1 is the numpy array
-# Train-80%,Val-10%-Test-10%
 train_cts, train_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
-MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskVal.npz'
-CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctVal.npz'
-val_cts, val_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
-MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTest.npz'
-CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTest.npz'
-test_cts, test_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
-
-# Print the percentages of the sets
-total_len = len(train_cts) + len(val_cts) + len(test_cts)
-print("Ignore above as its from the Train.py file")
-print(
-    f'Train set contains {len(train_cts)} samples or {np.round(len(train_cts) / total_len * 100, 1)}% of the total data')
-print(
-    f'Validation set contains {len(val_cts)} samples or {np.round(len(val_cts) / total_len * 100, 1)}% of the total data')
-print(
-    f'Test set contains {len(test_cts)} samples or {np.round(len(test_cts) / total_len * 100, 1)}% of the total data')
-
-
-def class_balance(split, split_n):
-    mask_with_annots = 0
-    mask_without_annots = 0
-    print(f'{split_n} set')
-    for item in split:
-        # If item contains non-zero items it means we have a mask with catheter points
-        if np.any(item[1]):
-            mask_with_annots += 1
-        else:
-            mask_without_annots += 1
-    mask_with_perc = mask_with_annots / len(split)
-    mask_without_perc = mask_without_annots / len(split)
-    print(f'# of Masks with annotations: {mask_with_annots} ({mask_with_perc:.2f})\n'
-          f'# of Masks without annotations: {mask_without_annots} ({mask_without_perc:.2f})')
-
-
-split_list = [train_masks, val_masks, test_masks]
-split_names = ['Train', 'Validation', 'Test']
-
-for idx, split in enumerate(split_list):
-    class_balance(split, split_names[idx])
+test_ct = train_cts[0][1]
+test_mask = train_masks[15][1]
+image = np.expand_dims(test_ct, axis=0)
+image = torch.from_numpy(image)
+resized_img = v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT)(image)
+print(resized_img.size())
+fig, axs = plt.subplots(1, 2, figsize=(10, 6))
+resized_img = np.squeeze(resized_img.numpy())
+axs[0].imshow(resized_img)
+axs[1].imshow(test_ct)
+axs[0].set_title('Resized Image')
+axs[1].set_title('Original Image')
+plt.show()

@@ -18,13 +18,17 @@ import math
 # %% DEFINE ALL FUNCTIONS HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def save_CT_to_npz(CT_DIR, filename):
+    """
+    Save the CT slices saved as pngs to a npz file
+    @param CT_DIR: Path to CT image directory
+    @param filename: Name for the npz file ex. 'cts'
+    """
     all_cts = glob.glob(CT_DIR + "/*.png")
     # If you would like to sort per CT 
     # all_cts = sorted(all_cts, key = lambda f: int(''.join(filter(str.isdigit,f[:f.find("_")]) or -1)))
     sl_np_list = []
     name_list = []
     print("Saving all CT arrays to NPZ")
-    # Maybe use the digits from the filenames and not the idx
     for idx, file in enumerate(all_cts):
         file_idx = file.find("ct")
         sl = iio.imread(file)
@@ -40,6 +44,11 @@ def save_CT_to_npz(CT_DIR, filename):
 
 
 def save_CT_to_npz_V2(CT_DIR, filename):
+    """
+    Save the CT slices saved as npy arrays and divided into patient folders to a npz file
+    @param CT_DIR: Path to CT patient directory where all patient npy arrays are stored
+    @param filename: Name for the npz file ex. 'cts'
+    """
     patients = glob.glob(CT_DIR + '/*/')
     patients = sorted(patients, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
     sl_np_list = []
@@ -62,6 +71,11 @@ def save_CT_to_npz_V2(CT_DIR, filename):
 
 
 def save_masks_to_npz(MASK_DIR, filename):
+    """
+    Save the masks saved as pngs to a npz file
+    @param MASK_DIR: Path to mask image directory
+    @param filename: Name for the npz file ex. 'cts'
+    """
     all_masks = glob.glob(MASK_DIR + "/*.png")
     print("Saving all Mask arrays to NPZ")
     mask_np_list = []
@@ -208,27 +222,6 @@ def prepare_to_save_npz(ct_filenames, mask_filenames):
         mask_np_list.append(mask_np)
 
     return ct_name_list, ct_np_list, mask_name_list, mask_np_list
-    # train_patientsCT = res1[:split_train_idx]
-    # val_patientsCT = res1[split_train_idx:split_val_idx]
-    # test_patientsCT = res1[split_val_idx:]
-    # train_patientsMasks = res2[:split_train_idx]
-    # val_patientsMasks = res2[split_train_idx:split_val_idx]
-    # test_patientsMasks = res1[split_val_idx:]
-
-# def remove_underscore(CT_DIR,MASK_DIR):
-#    all_masks = glob.glob(MASK_DIR+"/*.png")
-#    all_cts = glob.glob(CT_DIR+"/*.png")
-#    for idx, old_file in enumerate(all_masks):
-#        name = old_file.replace("_","")
-#        new_file = str(name)
-#        print(new_file)
-#        os.rename(old_file,new_file)   
-#        
-#    for idx, old_file in enumerate(all_cts):
-#        name = old_file.replace("_","")
-#        new_file = str(name)
-#        #print(new_file)
-#        os.rename(old_file,new_file)
 
 
 # %% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -240,13 +233,14 @@ def main():
     # save_masks_to_npz(MASK_DIR,filename = "mask_npz")
     # save_CT_to_npz_V2(CT_DIR, filename='ctv2_npz')
 
-    split_folders(CT_DIR,MASK_DIR)
+    split_folders(CT_DIR, MASK_DIR)
 
     # # Load the saved npz
     # npz_cts = np.load(CT_DIR + "/ct_npz.npz")
     # npz_masks = np.load(MASK_DIR + "/mask_npz.npz")
     # # Compare the npz files with the originals
     # # keep in mind all_cts are randomized because of reading them from glob
+    # Can use the alphanumeric sorting function in the Predict file to deal with this
     # insp = npz_cts['ct0_10']
     # fig, axs = plt.subplots(1, 2)
     #
@@ -255,9 +249,6 @@ def main():
     # insp_mask = npz_masks['mask0_23']
     # axs[1].set_title("mask0_23")
     # axs[1].imshow(insp_mask, cmap='gray')
-    # # remove_underscore(CT_DIR,MASK_DIR) #DD NOT USE
-
-    # all_cts = glob.glob(CT_DIR+"/*.png")
 
 
 if __name__ == "__main__":

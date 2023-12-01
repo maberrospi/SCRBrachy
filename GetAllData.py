@@ -34,16 +34,6 @@ def create_Annotation_folder(Annotationfiles, ANNOTATION_DIR):
     print("All files successfully copied")
 
 
-# Create the CTfolder directories needed
-# NOT NEEDED
-def create_CT_directories(CTfolders, DICOM_DIR):
-    for i in range(len(CTfolders)):
-        path = DICOM_DIR + "/CT" + str(i)
-        # If the directory doesnt exist
-        if not os.path.exists(path):
-            os.mkdir(path)
-
-
 # %% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def main():
     ANNOTATION_DIR = "/home/ERASMUSMC/099035/Documents/AnnotationFiles"

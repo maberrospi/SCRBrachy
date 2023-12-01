@@ -30,7 +30,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 import torchvision
 from torchvision import utils
 from torchvision.transforms import v2
@@ -41,13 +41,20 @@ import random
 from tqdm import tqdm
 import logging
 from torch.utils.tensorboard import SummaryWriter
-from Model import UNet
+from UNet import UNet
+from AttUNet import AttUNet
 from Metrics import dice_loss, dice_coeff
 from Evaluate import evaluate, evaluate_loss
 
 
 # %% DEFINE ALL FUNCTIONS HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def load_data_npz(mask_path, cts_path):
+    """
+    Load the data from a npz file
+    @param mask_path: Path location of the masks npz file
+    @param cts_path: Path location of the cts npz file
+    @return: List of ct and mask tuples that contain the name and npy array
+    """
     # Load the saved npz
     npz_cts = np.load(cts_path)
     npz_masks = np.load(mask_path)
@@ -61,15 +68,21 @@ def load_data_npz(mask_path, cts_path):
 
 
 def split_data(cts, masks):
+    """
+    This function was replaced by a different kind of splitting method (per patient)
+
+    Split the data into training,validation and test sets
+    @param cts: List of ct tuples that contain the name and npy array (from load_data_npz)
+    @param masks: List of mask tuples that contain the name and npy array (from load_data_npz)
+    @return: List tuples for train, validation and test sets
+    """
     # The data is shuffled by the function
     train_perc, val_perc, test_perc = 0.8, 0.1, 0.1
     # Get validation set
     train_x, valid_x, train_y, valid_y = train_test_split(cts, masks, test_size=val_perc, random_state=42)
-    # train_y, valid_y = train_test_split(masks, test_size=val_perc, random_state=42)
     # Get training and test sets
     train_x, test_x, train_y, test_y = train_test_split(train_x, train_y, test_size=test_perc / (1 - val_perc),
                                                         random_state=42)
-    # train_y, test_y = train_test_split(train_y, test_size=test_perc/(1-val_perc), random_state=42)
     # Print the percentages of the sets
     print(
         f'Train set contains {len(train_x)} samples or {np.round(len(train_x) / len(cts) * 100, 1)}% of the total data')
@@ -80,46 +93,15 @@ def split_data(cts, masks):
     return (train_x, train_y), (valid_x, valid_y), (test_x, test_y)
 
 
-def view_centered(cts, masks, ct_number):
-    """View the centered image {Mask and CT} based on the calculation of the center of mass from the CT slice"""
-    # labeled_ct, num_features= ndimage.label(cts[ct_number][1], structure= np.ones((3,3)))
-    # Add padding on all edges to test a theory
-    # padded_ct = np.pad(cts[ct_number][1],100,'constant',constant_values = 0)
-    # Calculate center of mass
-    # com = measure.centroid(cts[ct_number][1])
-    com = ndimage.center_of_mass(cts[ct_number][1])
-    # Round the values returned and change type to uint8
-    com = np.round(com).astype(np.uint8)
-    print(com)
-    # Define truncated image size
-    imsize = int(192 / 2)
-    # Plot the original CT slice and the truncated CT slice
-    fig, axs = plt.subplots(1, 3, figsize=(10, 6))
-    axs[0].imshow(cts[ct_number][1][com[0] - imsize:com[0] + imsize, com[1] - imsize:com[1] + imsize], cmap='gray')
-    axs[0].set_title("Centered at center of mass")
-    axs[0].set_xticks(np.arange(0, imsize * 2, step=32))
-    axs[0].set_yticks(np.arange(0, imsize * 2, step=32))
-    axs[1].set_title("Original")
-    axs[1].imshow(cts[ct_number][1], cmap='gray')
-    axs[1].set_xticks(np.arange(0, cts[ct_number][1].shape[0], step=100))
-    axs[1].set_yticks(np.arange(0, cts[ct_number][1].shape[1], step=100))
-    axs[1].plot(com[1], com[0], 'r+')
-    axs[2].imshow(masks[ct_number][1][com[0] - imsize:com[0] + imsize, com[1] - imsize:com[1] + imsize], cmap='gray')
-    axs[2].set_title("Mask centered")
-    axs[2].set_xticks(np.arange(0, imsize * 2, step=32))
-    axs[2].set_yticks(np.arange(0, imsize * 2, step=32))
-
-
 class CTCatheterDataset(Dataset):
     """CTs and Catheter Masks Dataset"""
 
     def __init__(self, cts, masks, transform=None, train=False):
         """
-        Arguments:
-            cts (List): CT list containing a tuple of size 2 where index0 is the the name and index1 is the numpy array
-            masks (List): Mask list containing a tuple of size 2 where index0 is the the name and index1 is the numpy array
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
+        @param cts: CT list containing a tuple of size 2 where index0 is the the name and index1 is the numpy array
+        @param masks: Mask list containing a tuple of size 2 where index0 is the the name and index1 is the numpy array
+        @param transform: Optional (callable) transform to be applied on a sample
+        @param train: Boolean to perform augmentations only for the training set
         """
         self.cts = cts
         self.masks = masks
@@ -159,12 +141,18 @@ class CTCatheterDataset(Dataset):
 
     @staticmethod
     def preprocess(img):
+        """
+        This function initially took a CT image as input but has been changed to an array of CT HU
+        Preprocesses the input CT slice numpy array during predictions
+        """
         # Turn from PIL img to numpy
-        img = np.asarray(img)
+        #img = np.asarray(img)
         # Normalize the image first
-        img = img / 255
+        #img = img / 255
+        # Normalize the CT values
+        img = (img + 1024) / (3071 + 1024)
         # Images were saves as RGBA so we need to extract only one channel
-        img = img[:, :, 0]
+        #img = img[:, :, 0]
         # Turn into tensor
         # Adds 1d on the left part
         img = np.expand_dims(img, axis=0)
@@ -175,6 +163,7 @@ class CTCatheterDataset(Dataset):
 class Truncate(object):
     """ Truncate the images and masks to 192x192
         centered at the center of mass of the image
+        This doesn't always work so it is not used
     """
 
     def __init__(self, output_size=192):
@@ -318,7 +307,7 @@ class EarlyStopping:
         if val_loss < self.min_loss:
             self.min_loss = val_loss
             self.counter = 0
-        elif val_loss > (self.min_loss + self.min_delta):
+        elif val_loss >= (self.min_loss + self.min_delta):
             self.counter += 1
             if self.counter > self.patience:
                 return True
@@ -352,7 +341,7 @@ def train_model(
     print(mod_sum)
 
     # Create a writer with all default settings for use with TensorBoard
-    writer = SummaryWriter(log_dir='/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/runs/patientsplitbatch32balancedMore_lowerlr_pat10')
+    writer = SummaryWriter(log_dir='/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/runs/UnetB32Bal10lrHypwdHypES102ndbest')
 
     # 1. Create datasets 
     # We are using BETA APIs, so we deactivate the associated warning, thereby acknowledging that
@@ -360,31 +349,26 @@ def train_model(
     torchvision.disable_beta_transforms_warning()
 
     data_transform = v2.Compose([
-        # Truncate(),
         NormalizationMinMax(),
         ToTensor(),
         #v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT),
         RandomHorizontalFlip(chance=0.5),
         RandomVerticalFlip(chance=0.5),
-        RandomRotation(degrees=(-30, +30), chance=0.5)
-        # Could experiment with bilinear interpolation instead of nearest
+        RandomRotation(degrees=(-30, +30), chance=0.5),
+        v2.RandomApply(transforms=[v2.RandomAffine(degrees=0, translate=(0.2, 0.2))], p=0.5) # Translation
     ])
 
     data_transform_val_test = v2.Compose([
-        # Truncate(),
         NormalizationMinMax(),
         ToTensor(),
         #v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT)
     ])
 
-    # Limit the train and validation sets to make it easier to debug
-    # train_x_t = train_x[0:50]
-    # valid_x_t = valid_x[0:10]
-    # train_y_t = train_y[0:50]
-    # valid_y_t = valid_y[0:10]
-    # train_dataset = CTCatheterDataset(train_x_t, train_y_t, transform=data_transform, train=False)
-    # val_dataset = CTCatheterDataset(valid_x_t, valid_y_t, transform=data_transform, train=False)
-    train_dataset = CTCatheterDataset(train_cts, train_masks, transform=data_transform, train=True)
+    # Create two datasets, one for the original data without transformations, and one with transformations
+    # Then concatenate them to get one larger dataset which ensures that all initial data is kept
+    train_orig_dat = CTCatheterDataset(train_cts, train_masks, transform=data_transform_val_test, train=False)
+    train_augm_dat = CTCatheterDataset(train_cts, train_masks, transform=data_transform, train=True)
+    train_dataset = ConcatDataset([train_orig_dat, train_augm_dat])
     val_dataset = CTCatheterDataset(val_cts, val_masks, transform=data_transform_val_test, train=False)
     n_train = len(train_dataset)
     n_val = len(val_dataset)
@@ -392,12 +376,10 @@ def train_model(
 
     # 2. Create data loaders
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     n_batch_train = len(train_dataloader)
     n_batch_val = len(val_dataloader)
     # Check the size of the dataset with the augmentations
-    # Original size was 327 (4 data per batch)
-    # Augmented size is 1635 (4 data per batch)
     print(f"Train batch size: {n_batch_train}\nValidation batch size: {n_batch_val}")
 
     # Initialize Logging
@@ -415,22 +397,25 @@ def train_model(
     # 3. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.RMSprop(model.parameters(),
                               lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=10)  # goal: maximize Dice score
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=15)  # goal: maximize Dice score
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     # BCEWithLogitsLoss takes prediction as raw input instead of having to wrap it in sigmoid function
     # https://stackoverflow.com/questions/66906884/how-is-pytorchs-class-bcewithlogitsloss-exactly-implemented
     # Test using pos_weight
-    pos_weight = torch.full([1, 512, 512], 1000)
+    pos_weight = torch.full([1, 512, 512], 10)
     pos_weight = pos_weight.to(device=device, dtype=torch.float32)
     criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    early_stopper = EarlyStopping(patience=5, min_delta=0)
+    early_stopper = EarlyStopping(patience=10, min_delta=0)
     global_step = 0
 
     # 4. Begin Training
     for epoch in range(1, epochs + 1):
+        # Reshuffle the data before every epoch
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         # Make sure gradient tracking is on
         model.train()
-        # Set epoch loss back to 0
+        # Set epoch DSC and DSC loss back to 0
         epoch_train_loss = 0
         epoch_train_score = 0
         train_score = 0
@@ -455,15 +440,14 @@ def train_model(
                     # Run forward pass - Make prediction on images
                     masks_pred = model(images)
                     if model.n_classes == 1:
-                        # I have a feeling that the mask_pred squeezed and the true masks will NOT have the same size
-                        # Indeed it had an error and i added squeeze to both to get a size of BxHxW
+                        # Calculate the batch criterion loss
                         loss = criterion(masks_pred, true_masks.float())
-                        # print(loss)
-                        loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(),
-                                          multiclass=False)
+                        # Combine it with the batch DSC loss
+                        loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
+                        # Calculate the batch DSC
                         train_score = dice_coeff((F.sigmoid(masks_pred) > 0.5).float(), true_masks.float())
                     else:
-                        # Pretty sure this needs to be fixed but doesnt affect me now
+                        # If you use multiclass classification review this piece of code as it might need changes
                         loss = criterion(masks_pred, true_masks)
                         loss += dice_loss(
                             F.softmax(masks_pred, dim=1).float(),
@@ -480,7 +464,7 @@ def train_model(
                 # Clip the gradients to mitigate the problem of exploding gradients
                 torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)
                 # The step function invokes unscale to unscale the previously scaled gradients
-                # And then invoked optimizer.step() -> Performs single optimization step and parameter update
+                # And then invokes optimizer.step() -> Performs single optimization step and parameter update
                 grad_scaler.step(optimizer)
                 # Update the scale factor
                 grad_scaler.update()
@@ -505,7 +489,6 @@ def train_model(
                         logging.info('Validation Dice score: {}'.format(val_score))
 
         # Steps for computing the validation loss after every epoch
-        # I have a feeling that the mask_pred squeezed and the true masks will NOT have the same size
         epoch_val_loss = evaluate_loss(model, val_dataloader, criterion, device, amp)
         # Compute epoch train loss
         epoch_train_loss = epoch_train_loss / n_batch_train
@@ -534,17 +517,8 @@ def train_model(
             break
 
 
-def show_sample(image, mask):
-    # This results in rotated images
-    image = torch.transpose(torch.squeeze(image), 0, 1)
-    mask = torch.transpose(torch.squeeze(mask), 0, 1)
-    stack = np.hstack((image, mask))
-    plt.imshow(stack, cmap='gray')
-    plt.pause(0.001)  # pause a bit so that plots are updated
-
-
 # %% Global Variables %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-DIR_CHECKPOINT = Path('/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/exp3/')
+DIR_CHECKPOINT = Path('/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/unetHyperOptES102ndbest/')
 
 # Load the data
 # cts and masks are lists of tuples where tuple index0 is the name and index1 is the numpy array
@@ -564,14 +538,8 @@ val_cts, val_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
 #(train_x, train_y), (valid_x, valid_y), (test_x, test_y) = split_data(cts, masks)
 
 
-# As a reminder, sets have a shape of HxW
-
-
 # %% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def main():
-    # View an example of a centered CT and mask
-    # view_centered(cts,masks,13)
-    # view_centered(train_x,train_y,41)
 
     # We are using BETA APIs, so we deactivate the associated warning, thereby acknowledging that
     # some APIs may slightly change in the future
@@ -579,10 +547,10 @@ def main():
 
     # Hypeparameters
     batch_size = 32
-    learning_rate = 1e-7
-    epochs = 30
+    learning_rate = 1.1553e-7 #1.6571567439022332e-05 #3.599412761250273e-06
+    epochs = 100
     save_checkpoint = True
-    weight_decay: float = 1e-8
+    weight_decay: float = 6.14959e-9 #1.798324136658523e-7 #1.0583525660791425e-07
     momentum: float = 0.999
     gradient_clipping: float = 1.0
     bilinear_upsampling = False
@@ -596,10 +564,12 @@ def main():
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     model = UNet(n_channels=1, n_classes=1, bilinear=bilinear_upsampling)
+    #model = AttUNet(n_channels=1, n_classes=1, bilinear=bilinear_upsampling)
     # Tensor is or will be allocated in dense non-overlapping memory.
     # Strides represented by values in strides[0] > strides[2] > strides[3] > strides[1] == 1 aka NHWC order.
     model = model.to(memory_format=torch.channels_last)
 
+    # Upscaling can also be upsacaling so the info here should be changed
     logging.info(f'Network:\n'
                  f'\t{model.n_channels} input channels\n'
                  f'\t{model.n_classes} output channels (classes)\n'

@@ -2,32 +2,52 @@
 # coding: utf-8
 
 # %% Import libraries  HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-# get_ipython().run_line_magic('matplotlib', 'ipympl')
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import imageio.v2 as imageio
 from pydicom import dcmread
-import os, glob
+import os
+import glob
 from tqdm import tqdm
-from Read_Visualize_DICOMS import list_dicoms, find_slice_locations, show_single_slice_with_mask
+from Read_Visualize_DICOMS import list_dicoms
 from ImageData import ImageData
-
 from scipy.interpolate import interp1d
 
 
 # %% DEFINE ALL FUNCTIONS HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def list_annotations(annotation_dir, filename_expression='*.dcm'):
-    # does something with annotations
+    """
+    Lists Annotation Dicoms from a single folder
+    @param annotation_dir: Directory from where you want to list the Dicom files
+    @param filename_expression: File extension - Naturally its .dcm
+    @return: List of all the Dicom filenames
+    """
     filenames = glob.glob(os.path.join(annotation_dir, filename_expression))
     filenames = sorted(filenames, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
     print(f'There are {len(filenames)} annotations in the directory "{annotation_dir}"')
     return list(filenames)
 
 
-# Create a class for the Dwell Data
+def find_slice_locations(filenames):
+    """
+    Read all dicom files and extract their slice location in the Z axis (axial depth)
+    @param filenames: List of Dicom path locations
+    @return: List of Z locations and the shape of the 2D slice (x,y)
+    """
+    Zslices = []
+    for file in filenames:
+        sl = dcmread(file)
+        Zslices.append(sl.SliceLocation)
+    shape = sl.pixel_array.shape
+    return Zslices, shape
+
+
 class DwellData:
+    """
+    Extracts the dwell positions from an annotation Dicom (i.e. channels, positions and coordinates)
+    """
     channel = np.array([np.nan])
     position = np.array([np.nan])
     coordinates = np.array([0])
@@ -40,28 +60,34 @@ class DwellData:
         for c in range(0, len(channel_seq)):
             control_point_seq = channel_seq[c].BrachyControlPointSequence
             relative_position = float('NaN')
-            # Initialize arrays if its the first pass
-            # Checks if any of the values evaluates to True (non zero)
+            # Initialize arrays if it's the first pass
+            # Checks if any of the values evaluates to True (non-zero)
             is_nan = np.isnan(self.channel)
-            if (np.all(is_nan) == True):
-                # Initialize numpy arrays with zeros (1D,1D,3D)
+            if np.all(is_nan):
+                # Initialize numpy arrays with nan or zeros (1D,1D,3D)
                 self.channel = np.full((len(channel_seq) * len(control_point_seq)), np.nan)
                 self.position = np.full((len(channel_seq) * len(control_point_seq)), np.nan)
                 self.coordinates = np.zeros([len(channel_seq) * len(control_point_seq), 3])
             # Loop in the BrachyControlPointSequence from index len(seq)-1 to 0
             for i in range(len(control_point_seq) - 1, -1, -1):
-                if (control_point_seq[i].ControlPointRelativePosition != relative_position):
+                if control_point_seq[i].ControlPointRelativePosition != relative_position:
                     relative_position = control_point_seq[i].ControlPointRelativePosition
                     self.channel[k] = c + 1
                     self.position[k] = relative_position
                     self.coordinates[k, :] = control_point_seq[i].ControlPoint3DPosition
                     k += 1
-        self.channel = self.channel[np.isnan(self.channel) == False].astype('int32')
-        self.position = self.position[np.isnan(self.position) == False].astype('int32')
+        self.channel = self.channel[np.isnan(self.channel) is False].astype('int32')
+        self.position = self.position[np.isnan(self.position) is False].astype('int32')
         self.coordinates = self.coordinates[self.coordinates != 0].reshape((-1, 3))
 
 
 def DwellOnSliceInterpolation(PointData, Zslices):
+    """
+    Interpolate the extracted annotation data
+    @param PointData: Instance of a DwellData class which has extracted the annotations from a Dicom
+    @param Zslices: List of Z locations for the given instance
+    @return: 3D cloud of the interpolated annotations
+    """
     # Define empty cloud
     TotalCloud = []
 
@@ -126,9 +152,17 @@ def plot_slice_points(slice_points, sl_number):
 
 def create_and_save_mask(slice_points, ct_slice, shape, MASK_DIR, name='Test', patient_num=0, save=True):
     """
-    Function that creates and saved the mask in its appropriate folder
+    Function that creates and saves the mask in its appropriate folder
+    @param slice_points: Cloud of interpolated annotations
+    @param ct_slice: CT Dicom file of the patient
+    @param shape: Shape of the CT slices in the CT dicom patient directory
+    @param MASK_DIR: Path to directory to save the new mask images
+    @param name: Name of the specific mask being saved ex. mask0
+    @param patient_num: Number of the patient for a given folder used for naming the new images
+    @param save: Boolean to save the image or not
+    @return: Created mask and x,y location of annotations
 
-    Some changes have been made for V2 named here:
+    Some changes have been made for V2 (split by patient) named here:
         1. Added new parameter to pass the patient number called patient_num to save in appropriate folder
         2. Changed the 'file' variable to add this patient number and set folder name
 
@@ -198,9 +232,39 @@ def create_and_save_mask(slice_points, ct_slice, shape, MASK_DIR, name='Test', p
     return mask, x_pixels3x3, y_pixels3x3
 
 
+def show_single_slice_with_mask(filename, x, y):
+    """
+    Plot the newly create annotations on the original CT slice
+    @param filename: Path to the CT slice Dicom
+    @param x: X locations of the new annotation
+    @param y: Y locations of the new annotation
+    """
+    # Read dicom file
+    sl = imageio.imread(filename)
+    Coronal_pixel_space, Saggital_pixel_space = sl.meta['PixelSpacing']
+    print(f'Pixel spacing values:\n\tCoronal = {Coronal_pixel_space}mm\n\tSaggital = {Saggital_pixel_space}mm')
+    # Create an RGB array from the given image
+    # sl_RGB = np.dstack([sl,sl,sl])
+    # Show the annotations with red color if the x,y data exists
+    # sl[y,x] = 255
+    # Show the image with a gray colormap
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    ax.imshow(sl, cmap='gray')  # ,norm='linear'
+    if len(x) != 0 and len(y) != 0:
+        # sl_RGB[y,x] = [255,0,0]
+        plt.scatter(x, y, color="red", marker='s', s=72. / fig.dpi)
+    ax.axis('off')
+    ax.set_title('Axial slice')
+    plt.show()
+
+
 def create_and_save_folder_masks(annotation, ct_folder, ct_folder_number, MASK_DIR):
     """
     Create and save masks from ONE folder
+    @param annotation: Path to annotation Dicom
+    @param ct_folder: Path to CT Dicoms directory
+    @param ct_folder_number: Number of the patient for a given folder used for naming the new images
+    @param MASK_DIR: Path to directory to save the new mask images
 
     Some changes have been made for V2 named here:
         1. Used the ct_folder_number parameter to save the mask in the respective patient folder
@@ -222,12 +286,16 @@ def create_and_save_folder_masks(annotation, ct_folder, ct_folder_number, MASK_D
         slice_points = TotalCloud[TotalCloud[:, 2] == slice_number]
         name = "mask" + str(ct_folder_number) + "_" + str(index)
         # Create the mask, save it, and return its values and the x,y pixel positions (x,y pixel are only for visualization on original CT)
-        mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name, patient_num=ct_folder_number)
+        mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name,
+                                          patient_num=ct_folder_number)
 
 
 def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
     """
     Create and save ALL masks
+    @param annotation_files: Path to annotation Dicoms directory
+    @param ct_folders: Path to all CT Dicoms directory
+    @param MASK_DIR: Path to directory to save the new mask images
 
     Some changes have been made for V2 named here:
         1. Added folder_number to use for saving masks in respective patient folder
@@ -256,7 +324,8 @@ def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
                 slice_points = TotalCloud[TotalCloud[:, 2] == slice_number]
                 name = "mask" + str(idx) + "_" + str(index)
                 # Create the mask, save it, and return its values and the x,y pixel positions (x,y pixel are only for visualization on original CT)
-                mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name, patient_num=folder_number)
+                mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name,
+                                                  patient_num=folder_number)
 
             folder_number += 1
     else:

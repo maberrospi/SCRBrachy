@@ -8,6 +8,15 @@ from Metrics import multiclass_dice_coeff, dice_coeff, dice_loss
 # Run in inference mode which disables grads
 @torch.inference_mode()
 def evaluate(model, validation_loader, device, amp):
+    """
+    Evaluate the current validation DSC of the model in training
+
+    @param model: Model being trained
+    @param validation_loader: DataLoader instance of the validation set
+    @param device: CPU or GPU
+    @param amp: Boolean to enable/disable amp (Automatic Mixed Precision)
+    @return: Mean DSC of the validation set
+    """
     # Set model to evaluation mode
     model.eval()
     num_val_batches = len(validation_loader)
@@ -46,6 +55,16 @@ def evaluate(model, validation_loader, device, amp):
 # Run in inference mode which disables grads
 @torch.inference_mode()
 def evaluate_loss(model, validation_loader, criterion, device, amp):
+    """
+    Evaluate the current validation DSC loss of the model in training
+
+    @param model: Model being trained
+    @param validation_loader: DataLoader instance of the validation set
+    @param criterion: Loss criterion (for example BCEWithLogitsLoss)
+    @param device: CPU or GPU
+    @param amp: Boolean to enable/disable amp (Automatic Mixed Precision)
+    @return: Mean DSC loss of the validation set
+    """
     # Set model to evaluation mode
     model.eval()
     num_val_batches = len(validation_loader)

@@ -1,5 +1,5 @@
 import torch
-from Model import UNet
+from UNet import UNet
 
 dummy_input = torch.randn(4, 1, 512, 512)
 model = UNet(n_channels=1, n_classes=1)

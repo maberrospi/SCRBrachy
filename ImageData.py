@@ -34,9 +34,7 @@ class ImageData:
 
 # %% MAIN CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def main():
-    img = ImageData(
-        "/home/ERASMUSMC/099035/Documents/DICOMfiles/1.2.826.0.1.3680043.2.968.3.40779735.15284.1693921063.168.dcm"
-    )
+    img = ImageData("example_patient_dicom.dcm")
 
 
 if __name__ == "__main__":

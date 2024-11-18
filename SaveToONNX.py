@@ -11,7 +11,7 @@ output_name = ["Mask"]
 torch.onnx.export(
     model,
     dummy_input,
-    "MabUNet.onnx",
+    "ModelUNet.onnx",
     verbose=False,
     input_names=input_name,
     output_names=output_name,

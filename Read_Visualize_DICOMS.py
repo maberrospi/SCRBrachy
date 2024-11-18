@@ -215,8 +215,8 @@ def main():
     filenames_size = len(filenames)
 
     # Turns out imageio is faster when reading the DICOMS, but also has less info.
-    # print(timeit.timeit('imageio.imread(filename)',setup ='import imageio.v2 as imageio; filename = "/home/ERASMUSMC/099035/Documents/DICOMfiles/CT0/1.3.12.2.1107.5.1.4.100037.30000019022608594181000005109.dcm"' ,number=1000))
-    # print(timeit.timeit('dcmread(filename)',setup = 'from pydicom import dcmread; filename = "/home/ERASMUSMC/099035/Documents/DICOMfiles/CT0/1.3.12.2.1107.5.1.4.100037.30000019022608594181000005109.dcm"',number=1000))
+    # print(timeit.timeit('imageio.imread(filename)',setup ='import imageio.v2 as imageio; filename = "test.dcm"' ,number=1000))
+    # print(timeit.timeit('dcmread(filename)',setup = 'from pydicom import dcmread; filename = "test.dcm"',number=1000))
 
     # Show a single slice
     # show_single_slice(filenames[34])
@@ -248,14 +248,3 @@ if __name__ == "__main__":
 # The 2 dimensional array contains numbers where each
 # number represents the pixel value in Hounsfield Unit(HU)
 # slice.meta['shape']
-
-## Print single slice
-# slicet = dcmread(filenames[50])
-# plt.imshow(slicet.pixel_array, cmap = 'gray')
-# plt.axis('off')
-# plt.title('Axial slice')
-# plt.show()
-
-# Testing Image Data
-# ImgData = ImageData(filenames[0])
-# ImgData.VisAxial(25)

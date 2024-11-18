@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # %% Import libraries  HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,7 +14,8 @@ from scipy.interpolate import interp1d
 
 # %% DEFINE ALL FUNCTIONS HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-def list_annotations(annotation_dir, filename_expression='*.dcm'):
+
+def list_annotations(annotation_dir, filename_expression="*.dcm"):
     """
     Lists Annotation Dicoms from a single folder
     @param annotation_dir: Directory from where you want to list the Dicom files
@@ -25,7 +23,9 @@ def list_annotations(annotation_dir, filename_expression='*.dcm'):
     @return: List of all the Dicom filenames
     """
     filenames = glob.glob(os.path.join(annotation_dir, filename_expression))
-    filenames = sorted(filenames, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
+    filenames = sorted(
+        filenames, key=lambda f: int("".join(filter(str.isdigit, f) or -1))
+    )
     print(f'There are {len(filenames)} annotations in the directory "{annotation_dir}"')
     return list(filenames)
 
@@ -48,6 +48,7 @@ class DwellData:
     """
     Extracts the dwell positions from an annotation Dicom (i.e. channels, positions and coordinates)
     """
+
     channel = np.array([np.nan])
     position = np.array([np.nan])
     coordinates = np.array([0])
@@ -59,25 +60,36 @@ class DwellData:
         k = 0
         for c in range(0, len(channel_seq)):
             control_point_seq = channel_seq[c].BrachyControlPointSequence
-            relative_position = float('NaN')
+            relative_position = float("NaN")
             # Initialize arrays if it's the first pass
             # Checks if any of the values evaluates to True (non-zero)
             is_nan = np.isnan(self.channel)
             if np.all(is_nan):
                 # Initialize numpy arrays with nan or zeros (1D,1D,3D)
-                self.channel = np.full((len(channel_seq) * len(control_point_seq)), np.nan)
-                self.position = np.full((len(channel_seq) * len(control_point_seq)), np.nan)
-                self.coordinates = np.zeros([len(channel_seq) * len(control_point_seq), 3])
+                self.channel = np.full(
+                    (len(channel_seq) * len(control_point_seq)), np.nan
+                )
+                self.position = np.full(
+                    (len(channel_seq) * len(control_point_seq)), np.nan
+                )
+                self.coordinates = np.zeros(
+                    [len(channel_seq) * len(control_point_seq), 3]
+                )
             # Loop in the BrachyControlPointSequence from index len(seq)-1 to 0
             for i in range(len(control_point_seq) - 1, -1, -1):
-                if control_point_seq[i].ControlPointRelativePosition != relative_position:
-                    relative_position = control_point_seq[i].ControlPointRelativePosition
+                if (
+                    control_point_seq[i].ControlPointRelativePosition
+                    != relative_position
+                ):
+                    relative_position = control_point_seq[
+                        i
+                    ].ControlPointRelativePosition
                     self.channel[k] = c + 1
                     self.position[k] = relative_position
                     self.coordinates[k, :] = control_point_seq[i].ControlPoint3DPosition
                     k += 1
-        self.channel = self.channel[np.isnan(self.channel) is False].astype('int32')
-        self.position = self.position[np.isnan(self.position) is False].astype('int32')
+        self.channel = self.channel[np.isnan(self.channel) is False].astype("int32")
+        self.position = self.position[np.isnan(self.position) is False].astype("int32")
         self.coordinates = self.coordinates[self.coordinates != 0].reshape((-1, 3))
 
 
@@ -98,11 +110,13 @@ def DwellOnSliceInterpolation(PointData, Zslices):
         # Fit spline through point cloud
         if len(xyz) > 1:
             # Find Zslices within the range of z for the current channel
-            Zslices_in_range = [z for z in Zslices if min(xyz[:, 2]) <= z <= max(xyz[:, 2])]
+            Zslices_in_range = [
+                z for z in Zslices if min(xyz[:, 2]) <= z <= max(xyz[:, 2])
+            ]
 
             if Zslices_in_range:  # Check if there are any Zslices in range
-                ppx = interp1d(xyz[:, 2], xyz[:, 0], kind='cubic')
-                ppy = interp1d(xyz[:, 2], xyz[:, 1], kind='cubic')
+                ppx = interp1d(xyz[:, 2], xyz[:, 0], kind="cubic")
+                ppy = interp1d(xyz[:, 2], xyz[:, 1], kind="cubic")
                 # print(Zslices_in_range)
                 # Evaluate spline on new grid
                 xyznew = np.zeros((len(Zslices_in_range), 3))
@@ -130,11 +144,23 @@ def visualize_interpolated_annotations(PointData, TotalCloud):
     # Plot both clouds in 3D
     fig = plt.figure(1, figsize=(6, 6))
     ax = plt.axes(projection="3d")
-    ax.scatter3D(PointData.coordinates[:, 0], PointData.coordinates[:, 1], PointData.coordinates[:, 2], s=10)
-    ax.scatter3D(TotalCloud[:, 0], TotalCloud[:, 1], TotalCloud[:, 2], color="red", s=30, marker='x')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
+    ax.scatter3D(
+        PointData.coordinates[:, 0],
+        PointData.coordinates[:, 1],
+        PointData.coordinates[:, 2],
+        s=10,
+    )
+    ax.scatter3D(
+        TotalCloud[:, 0],
+        TotalCloud[:, 1],
+        TotalCloud[:, 2],
+        color="red",
+        s=30,
+        marker="x",
+    )
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
     plt.title("Annotations")
     plt.show()
 
@@ -143,14 +169,16 @@ def plot_slice_points(slice_points, sl_number):
     # Plot points of #ct slice
     slice_points = slice_points
     fig = plt.figure(2, figsize=(6, 6))
-    plt.scatter(slice_points[:, 0], slice_points[:, 1], color="red", marker='x')
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title(f'Z = {sl_number} mm')
+    plt.scatter(slice_points[:, 0], slice_points[:, 1], color="red", marker="x")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(f"Z = {sl_number} mm")
     plt.show()
 
 
-def create_and_save_mask(slice_points, ct_slice, shape, MASK_DIR, name='Test', patient_num=0, save=True):
+def create_and_save_mask(
+    slice_points, ct_slice, shape, MASK_DIR, name="Test", patient_num=0, save=True
+):
     """
     Function that creates and saves the mask in its appropriate folder
     @param slice_points: Cloud of interpolated annotations
@@ -175,13 +203,17 @@ def create_and_save_mask(slice_points, ct_slice, shape, MASK_DIR, name='Test', p
     # Find all the X pixel positions
     x_pixels_list = []
     for x in Xpositions:
-        x_pixels_list.append(np.where(np.power(img.xaxis - x, 2) == np.min(np.power(img.xaxis - x, 2))))
+        x_pixels_list.append(
+            np.where(np.power(img.xaxis - x, 2) == np.min(np.power(img.xaxis - x, 2)))
+        )
     x_pixels = np.squeeze(x_pixels_list)
 
     # Find all the Y pixel positions
     y_pixels_list = []
     for y in Ypositions:
-        y_pixels_list.append(np.where(np.power(img.yaxis - y, 2) == np.min(np.power(img.yaxis - y, 2))))
+        y_pixels_list.append(
+            np.where(np.power(img.yaxis - y, 2) == np.min(np.power(img.yaxis - y, 2)))
+        )
     y_pixels = np.squeeze(y_pixels_list)
 
     # Check if pixel arrays are not empty
@@ -227,7 +259,7 @@ def create_and_save_mask(slice_points, ct_slice, shape, MASK_DIR, name='Test', p
         if not os.path.exists(os.path.join(MASK_DIR, "MASKS" + str(patient_num))):
             os.mkdir(os.path.join(MASK_DIR, "MASKS" + str(patient_num)))
         file = MASK_DIR + "/" + "MASKS" + str(patient_num) + "/" + str(name) + ".png"
-        plt.imsave(file, mask, cmap='gray')
+        plt.imsave(file, mask, cmap="gray")
 
     return mask, x_pixels3x3, y_pixels3x3
 
@@ -241,20 +273,22 @@ def show_single_slice_with_mask(filename, x, y):
     """
     # Read dicom file
     sl = imageio.imread(filename)
-    Coronal_pixel_space, Saggital_pixel_space = sl.meta['PixelSpacing']
-    print(f'Pixel spacing values:\n\tCoronal = {Coronal_pixel_space}mm\n\tSaggital = {Saggital_pixel_space}mm')
+    Coronal_pixel_space, Saggital_pixel_space = sl.meta["PixelSpacing"]
+    print(
+        f"Pixel spacing values:\n\tCoronal = {Coronal_pixel_space}mm\n\tSaggital = {Saggital_pixel_space}mm"
+    )
     # Create an RGB array from the given image
     # sl_RGB = np.dstack([sl,sl,sl])
     # Show the annotations with red color if the x,y data exists
     # sl[y,x] = 255
     # Show the image with a gray colormap
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    ax.imshow(sl, cmap='gray')  # ,norm='linear'
+    ax.imshow(sl, cmap="gray")  # ,norm='linear'
     if len(x) != 0 and len(y) != 0:
         # sl_RGB[y,x] = [255,0,0]
-        plt.scatter(x, y, color="red", marker='s', s=72. / fig.dpi)
-    ax.axis('off')
-    ax.set_title('Axial slice')
+        plt.scatter(x, y, color="red", marker="s", s=72.0 / fig.dpi)
+    ax.axis("off")
+    ax.set_title("Axial slice")
     plt.show()
 
 
@@ -272,12 +306,16 @@ def create_and_save_folder_masks(annotation, ct_folder, ct_folder_number, MASK_D
 
     """
 
-    print('Creating all masks for the CT images in the folder given using the Annotated interpolation data')
+    print(
+        "Creating all masks for the CT images in the folder given using the Annotated interpolation data"
+    )
     # Create an object of class DwellData
     PointData = DwellData(annotation)
     # Read all CT slice dicoms for given annotation file
     filenames_slices = list_dicoms(ct_folder)
-    filenames_slices = sorted(filenames_slices, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
+    filenames_slices = sorted(
+        filenames_slices, key=lambda f: int("".join(filter(str.isdigit, f) or -1))
+    )
     # Extract the Z slice locations and the shape of the image
     Zslices, shape = find_slice_locations(filenames_slices)
     # Interpolate Dwell Points on slices
@@ -286,8 +324,14 @@ def create_and_save_folder_masks(annotation, ct_folder, ct_folder_number, MASK_D
         slice_points = TotalCloud[TotalCloud[:, 2] == slice_number]
         name = "mask" + str(ct_folder_number) + "_" + str(index)
         # Create the mask, save it, and return its values and the x,y pixel positions (x,y pixel are only for visualization on original CT)
-        mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name,
-                                          patient_num=ct_folder_number)
+        mask, x, y = create_and_save_mask(
+            slice_points,
+            filenames_slices[index],
+            shape,
+            MASK_DIR,
+            name=name,
+            patient_num=ct_folder_number,
+        )
 
 
 def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
@@ -308,13 +352,18 @@ def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
     if filenames_size == folders_size:
         # Folder number to use when saving all the annotations in their respective patient folder
         folder_number = 0
-        print("Creating all the masks for the CT images using the Annotated interpolation data")
+        print(
+            "Creating all the masks for the CT images using the Annotated interpolation data"
+        )
         for idx, annotation in enumerate(tqdm(annotation_files, desc="Creating Masks")):
             # Create an object of class DwellData
             PointData = DwellData(annotation)
             # Read all CT slice dicoms for given annotation file
             filenames_slices = list_dicoms(ct_folders[idx])
-            filenames_slices = sorted(filenames_slices, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
+            filenames_slices = sorted(
+                filenames_slices,
+                key=lambda f: int("".join(filter(str.isdigit, f) or -1)),
+            )
             # Extract the Z slice locations and the shape of the image
             Zslices, shape = find_slice_locations(filenames_slices)
             # Interpolate Dwell Points on slices
@@ -324,8 +373,14 @@ def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
                 slice_points = TotalCloud[TotalCloud[:, 2] == slice_number]
                 name = "mask" + str(idx) + "_" + str(index)
                 # Create the mask, save it, and return its values and the x,y pixel positions (x,y pixel are only for visualization on original CT)
-                mask, x, y = create_and_save_mask(slice_points, filenames_slices[index], shape, MASK_DIR, name=name,
-                                                  patient_num=folder_number)
+                mask, x, y = create_and_save_mask(
+                    slice_points,
+                    filenames_slices[index],
+                    shape,
+                    MASK_DIR,
+                    name=name,
+                    patient_num=folder_number,
+                )
 
             folder_number += 1
     else:
@@ -334,23 +389,24 @@ def create_and_save_all_folder_masks(annotation_files, ct_folders, MASK_DIR):
 
 def plot_mask(mask):
     fig = plt.figure(3, figsize=(6, 6))
-    plt.imshow(mask, cmap='gray')
+    plt.imshow(mask, cmap="gray")
     plt.show()
 
 
 # %% MAIN CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 def main():
     # some dummy data
     VisualizeSliceNumber = 40  # which channel to plot in 2D
     # Read DICOM annotations
     ANNOTATION_DIR = "/home/ERASMUSMC/099035/Documents/AnnotationFiles"
-    DICOM_DIR = '/home/ERASMUSMC/099035/Documents/DICOMfiles'
-    MASK_DIR = '/home/ERASMUSMC/099035/Documents/MasksV2'
+    DICOM_DIR = "/home/ERASMUSMC/099035/Documents/DICOMfiles"
+    MASK_DIR = "/home/ERASMUSMC/099035/Documents/MasksV2"
     # Read filenames and find total number for files
     filenames = list_annotations(ANNOTATION_DIR)
-    folders = glob.glob(DICOM_DIR + '/*')
-    folders = sorted(folders, key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
+    folders = glob.glob(DICOM_DIR + "/*")
+    folders = sorted(folders, key=lambda f: int("".join(filter(str.isdigit, f) or -1)))
 
     # # Create an object of class DwellData
     # PointData = DwellData(filenames[9])

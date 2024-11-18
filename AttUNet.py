@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Mon Oct 16 11:18:40 2023
 
 @author: ERASMUSMC+099035
 """
+
 # %% Import libraries  HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import torch
 import torch.nn as nn
@@ -13,12 +12,12 @@ import torch.nn.functional as F
 
 # %% DEFINE ALL UNET PARTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class DoubleConv(nn.Module):
-    """ This class makes 3 calculations twice
-    
+    """This class makes 3 calculations twice
+
     1. Calculates the convolution of the input channels
     2. Calculates the batch norm of the convolution output
     3. Passes the batch norm output through a ReLU function
-    
+
     """
 
     def __init__(self, in_channels, out_channels, mid_channels=None):
@@ -34,7 +33,7 @@ class DoubleConv(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
@@ -42,16 +41,15 @@ class DoubleConv(nn.Module):
 
 
 class DownSampling(nn.Module):
-    """ This class performs the downsampling or contraction of the feature data
-        and then a double convolution
+    """This class performs the downsampling or contraction of the feature data
+    and then a double convolution
     """
 
     def __init__(self, in_channels, out_channels):
         super().__init__()
         # Max pooling uses 2x2 kernel
         self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            nn.MaxPool2d(2), DoubleConv(in_channels, out_channels)
         )
 
     def forward(self, x):
@@ -59,7 +57,7 @@ class DownSampling(nn.Module):
 
 
 class UpSampling(nn.Module):
-    """ This class performs the upsampling or expansion of the double convolution"""
+    """This class performs the upsampling or expansion of the double convolution"""
 
     # Technically reduces the number of channels while increasing the spatial resolution of the feature map
     # align_corners preserves the values at input/output border pixels
@@ -68,18 +66,18 @@ class UpSampling(nn.Module):
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.upsampling = nn.Sequential(
-                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+                nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
                 nn.BatchNorm2d(out_channels),
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             )
         else:
             self.upsampling = nn.Sequential(
-                #nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2),
-                nn.Upsample(scale_factor=2, mode='nearest'),
+                # nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2),
+                nn.Upsample(scale_factor=2, mode="nearest"),
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
                 nn.BatchNorm2d(out_channels),
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             )
 
     def forward(self, x):
@@ -87,7 +85,7 @@ class UpSampling(nn.Module):
 
 
 class OutConv(nn.Module):
-    """ This class calculates the output by passing through a final convolution"""
+    """This class calculates the output by passing through a final convolution"""
 
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
@@ -107,18 +105,18 @@ class Attention_block(nn.Module):
 
         self.W_g = nn.Sequential(
             nn.Conv2d(F_l, F_int, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(F_int)
+            nn.BatchNorm2d(F_int),
         )
 
         self.W_x = nn.Sequential(
             nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(F_int)
+            nn.BatchNorm2d(F_int),
         )
 
         self.psi = nn.Sequential(
             nn.Conv2d(F_int, 1, kernel_size=1, stride=1, padding=0, bias=True),
             nn.BatchNorm2d(1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
         self.relu = nn.ReLU(inplace=True)
@@ -133,6 +131,7 @@ class Attention_block(nn.Module):
 
 
 # %% DEFINE UNET MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 class AttUNet(nn.Module):
     def __init__(self, n_channels, n_classes=1, bilinear=False):

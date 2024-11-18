@@ -1,16 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 17 15:39:58 2023
-
-@author: ERASMUSMC+099035
-"""
-
 import torch
 from torch import Tensor
 
 
-def dice_coeff(inp: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6) -> float:
+def dice_coeff(
+    inp: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6
+) -> float:
     """
     Calculates the DSC of two inputs
     @param inp: First input tensor of 2,3 or 4 dimensions
@@ -35,12 +29,16 @@ def dice_coeff(inp: Tensor, target: Tensor, reduce_batch_first: bool = False, ep
 
 
 # This function was not used for the purpose of this study but could be useful
-def multiclass_dice_coeff(inp: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6):
+def multiclass_dice_coeff(
+    inp: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6
+):
     """
     Calculates mean DSC for multiple classes
     """
     # Average of Dice coefficient for all classes
-    return dice_coeff(inp.flatten(0, 1), target.flatten(0, 1), reduce_batch_first, epsilon)
+    return dice_coeff(
+        inp.flatten(0, 1), target.flatten(0, 1), reduce_batch_first, epsilon
+    )
 
 
 def dice_loss(inp: Tensor, target: Tensor, multiclass: bool = False):

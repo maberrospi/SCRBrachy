@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Mon Oct  9 13:31:14 2023
-
-@author: ERASMUSMC+099035
-
 Reformatted version of 'Train.py' to perform Hyperparameter Tuning using Ray Tune.
 """
 
@@ -86,7 +80,7 @@ class CTCatheterDataset(Dataset):
 
         image = self.cts[idx][1]
         mask = self.masks[idx][1]
-        sample = {'image': image, 'mask': mask}
+        sample = {"image": image, "mask": mask}
 
         # Set RNG for reproducibility
         random.seed(42)
@@ -115,9 +109,9 @@ class CTCatheterDataset(Dataset):
 
 
 class Truncate(object):
-    """ Truncate the images and masks to 192x192
-        centered at the center of mass of the image
-        This doesn't always work so it is not used
+    """Truncate the images and masks to 192x192
+    centered at the center of mass of the image
+    This doesn't always work so it is not used
     """
 
     def __init__(self, output_size=192):
@@ -129,7 +123,7 @@ class Truncate(object):
             self.output_size = output_size
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
 
         # Calculate center of mass
         com = ndimage.center_of_mass(image)
@@ -139,22 +133,26 @@ class Truncate(object):
         # Define truncated image size divided by 2
         halfimsize = int(self.output_size[0] / 2)
         print(com[0])
-        image = image[com[0] - halfimsize:com[0] + halfimsize,
-                com[1] - halfimsize:com[1] + halfimsize]
+        image = image[
+            com[0] - halfimsize : com[0] + halfimsize,
+            com[1] - halfimsize : com[1] + halfimsize,
+        ]
 
-        mask = mask[com[0] - halfimsize:com[0] + halfimsize,
-               com[1] - halfimsize:com[1] + halfimsize]
+        mask = mask[
+            com[0] - halfimsize : com[0] + halfimsize,
+            com[1] - halfimsize : com[1] + halfimsize,
+        ]
 
         print(com[0])
 
-        return {'image': image, 'mask': mask}
+        return {"image": image, "mask": mask}
 
 
 class ToTensor(object):
     """Convert ndarrays in a sample to Tensors."""
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
 
         # swap color axis because
         # numpy image: H x W x C
@@ -162,28 +160,26 @@ class ToTensor(object):
         # Adds 1d on the left part
         image = np.expand_dims(image, axis=0)
         mask = np.expand_dims(mask, axis=0)
-        return {'image': torch.from_numpy(image),
-                'mask': torch.from_numpy(mask)}
+        return {"image": torch.from_numpy(image), "mask": torch.from_numpy(mask)}
 
 
 class NormalizationMinMax(object):
     """
-        Normalize all the data using min max normalization between 0-1
-        The Masks are numpy arrays that contain either 0 or 1(255) for black and white respectively
-            Therefore the masks are normalized by just dividing with 255
-        The CT images are numpy arrays that contain Hounsfield unit values
-            The min and max from all the training slices has been pre-calculated and is -1024 and 3071 respectively
-            These values will have to be changed if you use a different dataset
-            Therefore the images are normalized by subtracting the min and dividing by the max-min
+    Normalize all the data using min max normalization between 0-1
+    The Masks are numpy arrays that contain either 0 or 1(255) for black and white respectively
+        Therefore the masks are normalized by just dividing with 255
+    The CT images are numpy arrays that contain Hounsfield unit values
+        The min and max from all the training slices has been pre-calculated and is -1024 and 3071 respectively
+        These values will have to be changed if you use a different dataset
+        Therefore the images are normalized by subtracting the min and dividing by the max-min
     """
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
         # Min-Max-Norm = (x-min) / (max-min)
         image = (image + 1024) / (3071 + 1024)
         mask = mask / 255
-        return {'image': image,
-                'mask': mask}
+        return {"image": image, "mask": mask}
 
 
 class RandomHorizontalFlip(object):
@@ -191,17 +187,16 @@ class RandomHorizontalFlip(object):
 
     def __init__(self, chance=0.5):
         assert isinstance(chance, float)
-        assert (0 <= chance <= 1)
+        assert 0 <= chance <= 1
         self.chance = chance
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
         # Random horizontal flipping
         if random.random() > self.chance:
             image = TF.hflip(image)
             mask = TF.hflip(mask)
-        return {'image': image,
-                'mask': mask}
+        return {"image": image, "mask": mask}
 
 
 class RandomVerticalFlip(object):
@@ -209,17 +204,16 @@ class RandomVerticalFlip(object):
 
     def __init__(self, chance=0.5):
         assert isinstance(chance, float)
-        assert (0 <= chance <= 1)
+        assert 0 <= chance <= 1
         self.chance = chance
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
         # Random horizontal flipping
         if random.random() > self.chance:
             image = TF.vflip(image)
             mask = TF.vflip(mask)
-        return {'image': image,
-                'mask': mask}
+        return {"image": image, "mask": mask}
 
 
 class RandomRotation(v2.RandomRotation):
@@ -229,21 +223,19 @@ class RandomRotation(v2.RandomRotation):
         # Initialize the super class with degrees as passed in the input
         super().__init__(degrees=degrees, interpolation=TF.InterpolationMode.NEAREST)
         assert isinstance(chance, float)
-        assert (0 <= chance <= 1)
+        assert 0 <= chance <= 1
         self.chance = chance
 
     def __call__(self, sample):
-        image, mask = sample['image'], sample['mask']
+        image, mask = sample["image"], sample["mask"]
         if random.random() > self.chance:
             params = super()._get_params(self)
             image_new = super()._transform(image, params)
             mask_new = super()._transform(mask, params)
 
-            return {'image': image_new,
-                    'mask': mask_new}
+            return {"image": image_new, "mask": mask_new}
         else:
-            return {'image': image,
-                    'mask': mask}
+            return {"image": image, "mask": mask}
 
 
 # Inspiration https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
@@ -268,37 +260,36 @@ class EarlyStopping:
 
 
 def train_model(
-        config,
-        batch_size=32,
-        learning_rate=1e-5,
-        epochs=100,
-        save_checkpoint=True,
-        weight_decay: float = 1e-8,
-        momentum: float = 0.999,
-        gradient_clipping: float = 1.0,
-        bilinear_upsampling=False,
-        # Fast and memory efficient training
-        amp=True,
-
+    config,
+    batch_size=32,
+    learning_rate=1e-5,
+    epochs=100,
+    save_checkpoint=True,
+    weight_decay: float = 1e-8,
+    momentum: float = 0.999,
+    gradient_clipping: float = 1.0,
+    bilinear_upsampling=False,
+    # Fast and memory efficient training
+    amp=True,
 ):
     # Define device: cpu or gpu
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logging.info(f'Using device {device}')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Using device {device}")
 
     # Load the data
     # cts and masks are lists of tuples where tuple index0 is the name and index1 is the numpy array
-    MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskTrain.npz'
-    CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTrain.npz'
+    MASK_NPZ_PATH = "/home/ERASMUSMC/099035/Documents/MasksV2/maskTrain.npz"
+    CT_NPZ_PATH = "/home/ERASMUSMC/099035/Documents/CTimagesV2/ctTrain.npz"
     train_cts, train_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
-    MASK_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/MasksV2/maskVal.npz'
-    CT_NPZ_PATH = '/home/ERASMUSMC/099035/Documents/CTimagesV2/ctVal.npz'
+    MASK_NPZ_PATH = "/home/ERASMUSMC/099035/Documents/MasksV2/maskVal.npz"
+    CT_NPZ_PATH = "/home/ERASMUSMC/099035/Documents/CTimagesV2/ctVal.npz"
     val_cts, val_masks = load_data_npz(MASK_NPZ_PATH, CT_NPZ_PATH)
 
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     # For this work only 1 and 1 were tested
     model = UNet(n_channels=1, n_classes=1, bilinear=bilinear_upsampling)
-    #model = AttUNet(n_channels=1, n_classes=1, bilinear=bilinear_upsampling)
+    # model = AttUNet(n_channels=1, n_classes=1, bilinear=bilinear_upsampling)
     # Tensor is or will be allocated in dense non-overlapping memory.
     # Strides represented by values in strides[0] > strides[2] > strides[3] > strides[1] == 1 aka NHWC order.
     model = model.to(memory_format=torch.channels_last)
@@ -306,58 +297,85 @@ def train_model(
     # Move the model to the current device (CPU or GPU)
     model.to(device=device)
 
-    # 1. Create datasets 
+    # 1. Create datasets
     # We are using BETA APIs, so we deactivate the associated warning, thereby acknowledging that
     # some APIs may slightly change in the future
     torchvision.disable_beta_transforms_warning()
 
-    data_transform = v2.Compose([
-        NormalizationMinMax(),
-        ToTensor(),
-        # v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT),
-        RandomHorizontalFlip(chance=0.5),
-        RandomVerticalFlip(chance=0.5),
-        RandomRotation(degrees=(-30, +30), chance=0.5),
-        v2.RandomApply(transforms=[v2.RandomAffine(degrees=0, translate=(0.2, 0.2))], p=0.5)  # Translation
-    ])
+    data_transform = v2.Compose(
+        [
+            NormalizationMinMax(),
+            ToTensor(),
+            # v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT),
+            RandomHorizontalFlip(chance=0.5),
+            RandomVerticalFlip(chance=0.5),
+            RandomRotation(degrees=(-30, +30), chance=0.5),
+            v2.RandomApply(
+                transforms=[v2.RandomAffine(degrees=0, translate=(0.2, 0.2))], p=0.5
+            ),  # Translation
+        ]
+    )
 
-    data_transform_val_test = v2.Compose([
-        NormalizationMinMax(),
-        ToTensor(),
-        # v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT)
-    ])
+    data_transform_val_test = v2.Compose(
+        [
+            NormalizationMinMax(),
+            ToTensor(),
+            # v2.Resize(size=(192, 192), interpolation=InterpolationMode.NEAREST_EXACT)
+        ]
+    )
 
     # Create two datasets, one for the original data without transformations, and one with transformations
     # Then concatenate them to get one larger dataset which ensures that all initial data is kept
-    train_orig_dat = CTCatheterDataset(train_cts, train_masks, transform=data_transform_val_test, train=False)
-    train_augm_dat = CTCatheterDataset(train_cts, train_masks, transform=data_transform, train=True)
+    train_orig_dat = CTCatheterDataset(
+        train_cts, train_masks, transform=data_transform_val_test, train=False
+    )
+    train_augm_dat = CTCatheterDataset(
+        train_cts, train_masks, transform=data_transform, train=True
+    )
     train_dataset = ConcatDataset([train_orig_dat, train_augm_dat])
-    val_dataset = CTCatheterDataset(val_cts, val_masks, transform=data_transform_val_test, train=False)
+    val_dataset = CTCatheterDataset(
+        val_cts, val_masks, transform=data_transform_val_test, train=False
+    )
     n_train = len(train_dataset)
     n_val = len(val_dataset)
 
     # 2. Create data loaders
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    val_dataloader = DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=True, drop_last=True
+    )
     n_batch_train = len(train_dataloader)
     n_batch_val = len(val_dataloader)
 
     # 3. Set up the optimizer, the loss and the loss scaling for AMP
-    optimizer = optim.RMSprop(model.parameters(),
-                              lr=config['lr'], weight_decay=config['wd'], momentum=momentum, foreach=True)
+    optimizer = optim.RMSprop(
+        model.parameters(),
+        lr=config["lr"],
+        weight_decay=config["wd"],
+        momentum=momentum,
+        foreach=True,
+    )
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     # Test using pos_weight
-    pos_weight = torch.full([1, 512, 512], config['weight'])
+    pos_weight = torch.full([1, 512, 512], config["weight"])
     pos_weight = pos_weight.to(device=device, dtype=torch.float32)
-    criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    criterion = (
+        nn.CrossEntropyLoss()
+        if model.n_classes > 1
+        else nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    )
     early_stopper = EarlyStopping(patience=10, min_delta=0)
     global_step = 0
 
     # 4. Begin Training
     for epoch in range(1, epochs + 1):
         # Reshuffle the data before every epoch
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True
+        )
+        val_dataloader = DataLoader(
+            val_dataset, batch_size=batch_size, shuffle=True, drop_last=True
+        )
         # Make sure gradient tracking is on
         model.train()
         # Set epoch DSC and DSC loss back to 0
@@ -366,37 +384,48 @@ def train_model(
         train_score = 0
         epoch_val_loss = 0
         for batch in train_dataloader:
-            images, true_masks = batch['image'], batch['mask']
+            images, true_masks = batch["image"], batch["mask"]
             # Throw error if n_channels is not correct
-            assert images.shape[1] == model.n_channels, \
-                f'Network has been defined with {model.n_channels} input channels, ' \
-                f'but loaded images have {images.shape[1]} channels. Please check that ' \
-                'the images are loaded correctly.'
+            assert images.shape[1] == model.n_channels, (
+                f"Network has been defined with {model.n_channels} input channels, "
+                f"but loaded images have {images.shape[1]} channels. Please check that "
+                "the images are loaded correctly."
+            )
 
             # Move images and labels to correct device and type
-            images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
+            images = images.to(
+                device=device, dtype=torch.float32, memory_format=torch.channels_last
+            )
             true_masks = true_masks.to(device=device, dtype=torch.long)
             # Make sure the input data does not have any NaN values
             assert not torch.isnan(images).any()
             assert not torch.isnan(true_masks).any()
             # This does not allow mps which is for GPU use in Mac devices
-            with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
+            with torch.autocast(
+                device.type if device.type != "mps" else "cpu", enabled=amp
+            ):
                 # Run forward pass - Make prediction on images
                 masks_pred = model(images)
                 if model.n_classes == 1:
                     # Calculate the batch criterion loss
                     loss = criterion(masks_pred, true_masks.float())
                     # Combine it with the batch DSC loss
-                    loss += dice_loss(F.sigmoid(masks_pred), true_masks.float(), multiclass=False)
+                    loss += dice_loss(
+                        F.sigmoid(masks_pred), true_masks.float(), multiclass=False
+                    )
                     # Calculate the batch DSC
-                    train_score = dice_coeff((F.sigmoid(masks_pred) > 0.5).float(), true_masks.float())
+                    train_score = dice_coeff(
+                        (F.sigmoid(masks_pred) > 0.5).float(), true_masks.float()
+                    )
                 else:
                     # If you use multiclass classification review this piece of code as it might need changes
                     loss = criterion(masks_pred, true_masks)
                     loss += dice_loss(
                         F.softmax(masks_pred, dim=1).float(),
-                        F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
-                        multiclass=True
+                        F.one_hot(true_masks, model.n_classes)
+                        .permute(0, 3, 1, 2)
+                        .float(),
+                        multiclass=True,
                     )
             # Zero your gradients for every batch before performing backpropagation
             # See zero_grad docs for why set_to_none
@@ -443,20 +472,26 @@ def train_model(
             Path(DIR_CHECKPOINT).mkdir(parents=True, exist_ok=True)
             state_dict = model.state_dict()
             # state_dict['mask_values'] = train_dataset.masks[:, 1]
-            torch.save(state_dict, str(DIR_CHECKPOINT / 'checkpoint_epoch{}.pth'.format(epoch)))
-            logging.info(f'Checkpoint {epoch} saved!')
+            torch.save(
+                state_dict, str(DIR_CHECKPOINT / "checkpoint_epoch{}.pth".format(epoch))
+            )
+            logging.info(f"Checkpoint {epoch} saved!")
 
         if early_stopper.early_stop(epoch_val_loss):
-            logging.info(f'Early stop of training at epoch {epoch}')
+            logging.info(f"Early stop of training at epoch {epoch}")
             break
 
         # Report the loss and DSC for Ray Tune
-        train.report({"loss": epoch_val_loss.item(), "accuracy": epoch_val_score.item()})
+        train.report(
+            {"loss": epoch_val_loss.item(), "accuracy": epoch_val_score.item()}
+        )
     print("Finished Training")
 
 
 # %% Global Variables %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-DIR_CHECKPOINT = Path('/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/exp17/')
+DIR_CHECKPOINT = Path(
+    "/home/ERASMUSMC/099035/Desktop/PythonWork/Baseenv/checkpoints/exp17/"
+)
 
 
 # %% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -465,7 +500,7 @@ def main(num_samples=10, max_num_epochs=100):
     # some APIs may slightly change in the future
     torchvision.disable_beta_transforms_warning()
 
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     # https://docs.ray.io/en/latest/tune/faq.html -> Good FAQ
     # https://docs.ray.io/en/latest/tune/api/search_space.html
@@ -473,14 +508,11 @@ def main(num_samples=10, max_num_epochs=100):
     config = {
         "lr": tune.loguniform(1e-8, 1e-3),
         "wd": tune.loguniform(1e-9, 1e-5),
-        "weight": tune.choice([1, 10, 100, 1000])
+        "weight": tune.choice([1, 10, 100, 1000]),
     }
     # https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.AsyncHyperBandScheduler.html#ray.tune.schedulers.AsyncHyperBandScheduler
     # Set scheduler
-    scheduler = ASHAScheduler(
-        max_t=max_num_epochs,
-        grace_period=5,
-        reduction_factor=2)
+    scheduler = ASHAScheduler(max_t=max_num_epochs, grace_period=5, reduction_factor=2)
 
     # https://docs.ray.io/en/latest/tune/api/doc/ray.tune.with_parameters.html#ray.tune.with_parameters
     # https://docs.ray.io/en/latest/tune/api/doc/ray.tune.with_resources.html
@@ -488,8 +520,7 @@ def main(num_samples=10, max_num_epochs=100):
     # Initialize Tuner
     tuner = tune.Tuner(
         tune.with_resources(
-            tune.with_parameters(train_model),
-            resources={"cpu": 5, "gpu": 1}
+            tune.with_parameters(train_model), resources={"cpu": 5, "gpu": 1}
         ),
         tune_config=tune.TuneConfig(
             metric="loss",
@@ -506,11 +537,13 @@ def main(num_samples=10, max_num_epochs=100):
     best_result = results.get_best_result("loss", "min")
 
     print("Best trial config: {}".format(best_result.config))
-    print("Best trial final validation loss: {}".format(
-        best_result.metrics["loss"]))
-    print("Best trial final validation accuracy: {}".format(
-        best_result.metrics["accuracy"]))
+    print("Best trial final validation loss: {}".format(best_result.metrics["loss"]))
+    print(
+        "Best trial final validation accuracy: {}".format(
+            best_result.metrics["accuracy"]
+        )
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(num_samples=30, max_num_epochs=100)

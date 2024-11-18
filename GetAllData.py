@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 # %% Import libraries HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import os, glob
 from shutil import copytree, copy2
@@ -9,7 +6,7 @@ from shutil import copytree, copy2
 # %% DEFINE ALL FUNCTIONS HERE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def create_CT_folder(CTfolders, DICOM_DIR):
     i = 0
-    print(f'Creating all CT folders in {DICOM_DIR}')
+    print(f"Creating all CT folders in {DICOM_DIR}")
     for lst in CTfolders:
         # Convert single item of the list into a string
         lst = "".join(lst)
@@ -24,7 +21,7 @@ def create_CT_folder(CTfolders, DICOM_DIR):
 
 def create_Annotation_folder(Annotationfiles, ANNOTATION_DIR):
     i = 0
-    print(f'Copying all Annotation data in {ANNOTATION_DIR}')
+    print(f"Copying all Annotation data in {ANNOTATION_DIR}")
     for lst in Annotationfiles:
         lst = "".join(lst)
         path = ANNOTATION_DIR + "/ANN" + str(i) + ".dcm"
@@ -37,12 +34,12 @@ def create_Annotation_folder(Annotationfiles, ANNOTATION_DIR):
 # %% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def main():
     ANNOTATION_DIR = "/home/ERASMUSMC/099035/Documents/AnnotationFiles"
-    DICOM_DIR = '/home/ERASMUSMC/099035/Documents/DICOMfiles'
-    ALLDATA_DIR = '/home/ERASMUSMC/099035/Documents/ForAItraining/prostate'
+    DICOM_DIR = "/home/ERASMUSMC/099035/Documents/DICOMfiles"
+    ALLDATA_DIR = "/home/ERASMUSMC/099035/Documents/ForAItraining/prostate"
     # Read all the folders in the prostate folder and sort them
     CTfolders = []
     Annotationfiles = []
-    folders = glob.glob(ALLDATA_DIR + '/*')
+    folders = glob.glob(ALLDATA_DIR + "/*")
     folders = sorted(folders)
     # Read all the subfolders in the prostate folder and divide into CT folders
     # and EMT data (Annotations)
@@ -52,7 +49,9 @@ def main():
             for subfolder in subfolders:
                 if len(os.listdir(subfolder)) != 0:
                     CTfolders.append(glob.glob(subfolder + "/*[!.dcm]"))
-                    Annotationfiles.append(glob.glob(os.path.join(subfolder, "*EMT*.dcm")))
+                    Annotationfiles.append(
+                        glob.glob(os.path.join(subfolder, "*EMT*.dcm"))
+                    )
 
     # Remove all unecessary files from the CT folders
     for ctidx, CTlist in enumerate(CTfolders):
